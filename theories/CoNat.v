@@ -4,18 +4,27 @@ From CoIndEx Require Export Prelude.
 
 Module Pos.
 
-  CoInductive conat := cozero | cosucc : conat -> conat.
+  (** ** Basic Definitions
 
-  (** ** Basic Definitions *)
+     First of all, define the conatural numbers in a positive way by giving their constructors.
+   *)
+  CoInductive conat : Type :=
+    | cozero : conat
+    | cosucc : conat -> conat.
 
+  (**
+     We can define the observer function [pred] of a conatural number which indicates whether a conatural number has a predeccor or not.
+   *)
   Definition pred (n : conat) : option conat :=
     match n with
     | cozero => None
     | cosucc n' => Some n'
     end.
 
-  (** ** Setoid *)
+  (** ** Setoid
 
+     We define an (equivalence) relation [conat_eq] which indicates that two streams are equal.
+   *)
   CoInductive conat_eq : conat -> conat -> Prop :=
     | cozero_conat_eq_cozero : conat_eq cozero cozero
     | cosucc_conat_eq_cosucc :
@@ -27,14 +36,30 @@ Module Pos.
   Proof.
     cofix conat_eq_Reflexive.
     intros [].
-    all: now constructor.
+    -
+      constructor.
+    -
+      constructor.
+      reflexivity. (* Can be used, as [conat_eq] is coninductively assumed to be reflexive. *)
+      Guarded.
+
+      Undo.
+
+      red in conat_eq_Reflexive.
+      Fail reflexivity. (* No visible instance of [Reflexive conat_eq] available. *)
+
+    Restart.
+
+    cofix conat_eq_Reflexive.
+    intros [].
+    all: now constructor. (* Implicit use of reflexivity. *)
   Qed.
 
   Instance conat_eq_Symmetric : Symmetric conat_eq.
   Proof.
     cofix conat_eq_Symmetric.
     all: inversion 1.
-    all: now constructor.
+    all: now constructor. (* Implcit use of [symmetry] in here. *)
   Qed.
       
   Instance conat_eq_Transitive : Transitive conat_eq.
@@ -42,15 +67,28 @@ Module Pos.
     cofix conat_eq_Transitive.
     do 2 inversion 1.
     all: constructor.
-    all: etransitivity.
+    all: etransitivity. (* Explicit use needed here *)
     all: eassumption.
   Qed.
 
+  (**
+     Thanks to [Program], Rocq infers the needed instances for reflexivity, symmetry and transitivity which we have shown above.
+   *)
   #[export] Program Instance conat_eq_Equivalence : Equivalence conat_eq.
   #[export] Program Instance conat_eq_Setoid : Setoid conat.
 
+  (**
+     We now have an instance of a [conat]-based [Setoid].
+     Therefore, we can use the notation [==] for [conat_eq].
+     In general, [==] stands for [equiv]:
+   *)
+  About equiv.
+
   #[export] Instance cosucc_Proper : Proper (equiv ==> equiv) cosucc.
   Proof.
+    simpl. (* [equiv] is replaced by [conat_eq] because of the typeclass mechanism. *)
+    Undo.
+
     now constructor.
   Qed.
 
@@ -69,7 +107,7 @@ Module Pos.
 
   Lemma eq_frob :
     forall n,
-      n = frob n.
+      n = frob n. (* Note the pure syntactical equality. *)
   Proof.
     now intros [].
   Qed.
@@ -80,12 +118,15 @@ End Pos.
 
 Module Neg.
 
+  (** ** Basic Definitions
+
+     We now switch roles of constructors and observers.
+     Concretely, we now define [conat] via its observer [pred] and derive its constructors afterward.
+   *)
   CoInductive conat :=
     {
       pred : option conat
     }.
-
-  (** ** Basic Definitions *)
 
   Definition cozero : conat :=
     {|
@@ -104,7 +145,7 @@ Module Neg.
   CoInductive conat_eq : relation conat :=
     | pred_conat_eq_pred :
         forall n m n' m',
-          n = {| pred := Some n' |} ->
+          n = {| pred := Some n' |} -> (* Note the syntactic equality. *)
           m = {| pred := Some m' |} ->
           conat_eq n' m' ->
           conat_eq n m
@@ -121,7 +162,7 @@ Module Neg.
   Instance conat_eq_Reflexive : Reflexive conat_eq.
   Proof.
     cofix conat_eq_Reflexive.
-    intros [[]].
+    intros [[|]].
     all: now econstructor.
   Qed.
 
@@ -172,6 +213,8 @@ Module Neg.
 
 End Neg.
 
+(** * Positive and Negative Conatural Numbers yield the same Setoid *)
+
 Module Pos_iso_Neg.
 
   Import Pos Neg.
@@ -188,7 +231,7 @@ Module Pos_iso_Neg.
     intros n m H1.
     all: inversion H1 as [? ? ? ? H2 H3 H4 H5 H6|]; subst.
     -
-      rewrite Pos.eq_frob with (n := Pos_from_Neg {| pred := Some n' |}).
+      rewrite Pos.eq_frob with (n := Pos_from_Neg {| pred := Some n' |}). (* We need eq_frob to explicitly simplify corecursive definitions. *)
       rewrite Pos.eq_frob with (n := Pos_from_Neg {| pred := Some m' |}).
       constructor.
       apply Pos_from_Neg_Proper.
